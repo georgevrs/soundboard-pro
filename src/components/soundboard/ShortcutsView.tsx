@@ -5,6 +5,7 @@ import { Sound, Shortcut } from '@/types/sound';
 import { HotkeyBadge } from './HotkeyBadge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { EditShortcutDialog } from './EditShortcutDialog';
 
 interface ShortcutsViewProps {
   shortcuts: Shortcut[];
@@ -20,6 +21,7 @@ export function ShortcutsView({
   onDeleteShortcut,
 }: ShortcutsViewProps) {
   const [recordingFor, setRecordingFor] = useState<string | null>(null);
+  const [editingShortcut, setEditingShortcut] = useState<Shortcut | null>(null);
 
   const getSoundForShortcut = (shortcut: Shortcut) => 
     sounds.find(s => s.id === shortcut.soundId);
@@ -132,7 +134,12 @@ export function ShortcutsView({
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => setEditingShortcut(shortcut)}
+                        >
                           <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button 
@@ -172,6 +179,13 @@ export function ShortcutsView({
           </ul>
         </div>
       </div>
+
+      {/* Edit Shortcut Dialog */}
+      <EditShortcutDialog
+        open={editingShortcut !== null}
+        onOpenChange={(open) => !open && setEditingShortcut(null)}
+        shortcut={editingShortcut}
+      />
     </div>
   );
 }

@@ -6,20 +6,22 @@ import { NowPlayingBar } from '@/components/soundboard/NowPlayingBar';
 import { ShortcutsView } from '@/components/soundboard/ShortcutsView';
 import { SettingsView } from '@/components/soundboard/SettingsView';
 import { EmptyState } from '@/components/soundboard/EmptyState';
-import { mockSounds, mockShortcuts, allTags } from '@/data/mockSounds';
+import { CreateSoundDialog } from '@/components/soundboard/CreateSoundDialog';
 import { Sound, Shortcut } from '@/types/sound';
-import { Grid, List, SortAsc, Moon, Sun } from 'lucide-react';
+import { Grid, List, SortAsc, Moon, Sun, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useSounds } from '@/hooks/useSounds';
+import { useShortcuts, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useShortcuts';
+import { usePlaySound, useStopSound, useToggleSound } from '@/hooks/usePlayback';
+import { useNowPlaying } from '@/hooks/usePlayback';
+import { toast } from '@/hooks/use-toast';
 
 type ViewMode = 'library' | 'shortcuts' | 'settings';
 type LayoutMode = 'grid' | 'list';
 type SortMode = 'recent' | 'name' | 'plays';
 
 export default function Index() {
-  const [sounds] = useState<Sound[]>(mockSounds);
-  const [shortcuts, setShortcuts] = useState<Shortcut[]>(mockShortcuts);
-  
   const [currentView, setCurrentView] = useState<ViewMode>('library');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('grid');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
@@ -29,10 +31,47 @@ export default function Index() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
-  const [playingSound, setPlayingSound] = useState<Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   
   const [isDark, setIsDark] = useState(true);
+
+  // API hooks
+  const { data: sounds = [], isLoading: soundsLoading, error: soundsError } = useSounds({
+    q: searchQuery || undefined,
+    tag: selectedTags.length > 0 ? selectedTags[0] : undefined,
+    source_type: selectedSource || undefined,
+    sort: sortMode,
+  });
+
+  const { data: shortcuts = [], isLoading: shortcutsLoading } = useShortcuts();
+  const { data: nowPlaying = [] } = useNowPlaying();
+  
+  // Playback mutations
+  const playMutation = usePlaySound();
+  const stopMutation = useStopSound();
+  const toggleMutation = useToggleSound();
+  
+  // Shortcut mutations
+  const updateShortcut = useUpdateShortcut();
+  const deleteShortcut = useDeleteShortcut();
+
+  // Get all unique tags from sounds
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    sounds.forEach(sound => {
+      sound.tags.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet);
+  }, [sounds]);
+
+  // Find currently playing sound
+  const playingSound = useMemo(() => {
+    if (!nowPlaying || nowPlaying.length === 0) return null;
+    const playing = nowPlaying[0];
+    return sounds.find(s => s.id === playing.sound_id) || null;
+  }, [nowPlaying, sounds]);
+
+  const isPlaying = playingSound !== null;
 
   // Apply dark mode
   useEffect(() => {
@@ -44,47 +83,10 @@ export default function Index() {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Filter and sort sounds
+  // Filter sounds (backend handles search, but we can do additional client-side filtering)
   const filteredSounds = useMemo(() => {
-    let result = [...sounds];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(s => 
-        s.name.toLowerCase().includes(query) ||
-        s.description.toLowerCase().includes(query) ||
-        s.tags.some(t => t.toLowerCase().includes(query))
-      );
-    }
-
-    // Tag filter
-    if (selectedTags.length > 0) {
-      result = result.filter(s => 
-        selectedTags.some(tag => s.tags.includes(tag))
-      );
-    }
-
-    // Source filter
-    if (selectedSource) {
-      result = result.filter(s => s.sourceType === selectedSource);
-    }
-
-    // Sort
-    switch (sortMode) {
-      case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'plays':
-        result.sort((a, b) => b.playCount - a.playCount);
-        break;
-      case 'recent':
-      default:
-        result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    }
-
-    return result;
-  }, [sounds, searchQuery, selectedTags, selectedSource, sortMode]);
+    return sounds;
+  }, [sounds]);
 
   const handleTagToggle = (tag: string) => {
     setSelectedTags(prev => 
@@ -94,32 +96,114 @@ export default function Index() {
     );
   };
 
-  const handlePlaySound = (sound: Sound) => {
-    if (playingSound?.id === sound.id && isPlaying) {
-      setIsPlaying(false);
-    } else {
-      setPlayingSound(sound);
-      setIsPlaying(true);
+  const handlePlaySound = async (sound: Sound) => {
+    try {
+      if (playingSound?.id === sound.id && isPlaying) {
+        // Stop if already playing
+        await stopMutation.mutateAsync(sound.id);
+      } else {
+        // Play the sound
+        await playMutation.mutateAsync({ soundId: sound.id, restart: false });
+        toast({
+          title: "Playing sound",
+          description: sound.name,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to play sound",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleStopSound = () => {
-    setIsPlaying(false);
-    setPlayingSound(null);
+  const handleStopSound = async () => {
+    if (playingSound) {
+      try {
+        await stopMutation.mutateAsync(playingSound.id);
+        toast({
+          title: "Stopped",
+          description: playingSound.name,
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to stop sound",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
-  const handleToggleShortcut = (id: string) => {
-    setShortcuts(prev => 
-      prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
-    );
+  const handleToggleShortcut = async (id: string) => {
+    const shortcut = shortcuts.find(s => s.id === id);
+    if (!shortcut) return;
+    
+    try {
+      await updateShortcut.mutateAsync({
+        id: shortcut.id,
+        data: {
+          enabled: !shortcut.enabled,
+        },
+      });
+      toast({
+        title: shortcut.enabled ? "Shortcut disabled" : "Shortcut enabled",
+        description: `Hotkey: ${shortcut.hotkey}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle shortcut",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteShortcut = (id: string) => {
-    setShortcuts(prev => prev.filter(s => s.id !== id));
+  const handleDeleteShortcut = async (id: string) => {
+    const shortcut = shortcuts.find(s => s.id === id);
+    if (!shortcut) return;
+    
+    try {
+      await deleteShortcut.mutateAsync(id);
+      toast({
+        title: "Shortcut deleted",
+        description: `Removed hotkey: ${shortcut.hotkey}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete shortcut",
+        variant: "destructive",
+      });
+    }
   };
 
   const getShortcutForSound = (soundId: string) => 
     shortcuts.find(s => s.soundId === soundId);
+
+  // Show loading state
+  if (soundsLoading || shortcutsLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (soundsError) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Failed to load sounds</p>
+          <p className="text-sm text-muted-foreground">
+            Make sure the backend is running at http://localhost:8000
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -148,6 +232,15 @@ export default function Index() {
                   <span className="text-sm text-muted-foreground">
                     {filteredSounds.length} sounds
                   </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="ml-4"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Sound
+                  </Button>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -212,7 +305,7 @@ export default function Index() {
                 {/* Sound Grid/List */}
                 <div className="flex-1 overflow-y-auto p-6">
                   {filteredSounds.length === 0 ? (
-                    <EmptyState onAddSound={() => {}} />
+                    <EmptyState onAddSound={() => setCreateDialogOpen(true)} />
                   ) : (
                     <div className={cn(
                       layoutMode === 'grid'
@@ -268,11 +361,17 @@ export default function Index() {
       <NowPlayingBar
         currentSound={playingSound}
         isPlaying={isPlaying}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
+        onPlay={() => playingSound && handlePlaySound(playingSound)}
+        onPause={() => playingSound && handleStopSound()}
         onStop={handleStopSound}
         onStopAll={handleStopSound}
-        playingSoundsCount={isPlaying && playingSound ? 1 : 0}
+        playingSoundsCount={nowPlaying?.length || 0}
+      />
+
+      {/* Create Sound Dialog */}
+      <CreateSoundDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
       />
     </div>
   );

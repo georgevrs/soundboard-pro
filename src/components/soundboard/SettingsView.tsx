@@ -1,19 +1,83 @@
-import { Settings as SettingsIcon, Volume2, Terminal, Download, Save } from 'lucide-react';
+import { Settings as SettingsIcon, Volume2, Terminal, Download, Save, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
+import { toast } from '@/hooks/use-toast';
 
 export function SettingsView() {
+  const { data: settingsData, isLoading } = useSettings();
+  const updateSettings = useUpdateSettings();
+  
   const [settings, setSettings] = useState({
-    audioOutputDevice: 'pipewire/alsa_output.pci-0000_00_1f.3.analog-stereo',
+    audioOutputDevice: '',
     mpvPath: 'mpv',
-    ytDlpPath: 'yt-dlp',
-    defaultVolume: 75,
+    youtubeDownloadTool: 'yt-dlp',
+    defaultVolume: 80,
     stopPreviousOnPlay: true,
     allowOverlappingSounds: false,
   });
+
+  // Load settings from API
+  useEffect(() => {
+    if (settingsData) {
+      setSettings({
+        audioOutputDevice: settingsData.audioOutputDevice || '',
+        mpvPath: settingsData.mpvPath || 'mpv',
+        youtubeDownloadTool: settingsData.youtubeDownloadTool || 'yt-dlp',
+        defaultVolume: settingsData.defaultVolume || 80,
+        stopPreviousOnPlay: settingsData.stopPreviousOnPlay ?? true,
+        allowOverlappingSounds: settingsData.allowOverlappingSounds ?? false,
+      });
+    }
+  }, [settingsData]);
+
+  const handleSave = async () => {
+    try {
+      await updateSettings.mutateAsync({
+        audioOutputDevice: settings.audioOutputDevice || undefined,
+        mpvPath: settings.mpvPath,
+        youtubeDownloadTool: settings.youtubeDownloadTool,
+        defaultVolume: settings.defaultVolume,
+        stopPreviousOnPlay: settings.stopPreviousOnPlay,
+        allowOverlappingSounds: settings.allowOverlappingSounds,
+      });
+      toast({
+        title: "Success",
+        description: "Settings saved successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExport = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Export functionality will be available soon",
+    });
+  };
+
+  const handleImport = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Import functionality will be available soon",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-muted-foreground">Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -49,7 +113,7 @@ export function SettingsView() {
               <Input
                 value={settings.audioOutputDevice}
                 onChange={(e) => setSettings({ ...settings, audioOutputDevice: e.target.value })}
-                placeholder="pipewire/alsa_output..."
+                placeholder="pipewire/alsa_output... (leave empty for default)"
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
@@ -128,8 +192,8 @@ export function SettingsView() {
                 yt-dlp Path
               </label>
               <Input
-                value={settings.ytDlpPath}
-                onChange={(e) => setSettings({ ...settings, ytDlpPath: e.target.value })}
+                value={settings.youtubeDownloadTool}
+                onChange={(e) => setSettings({ ...settings, youtubeDownloadTool: e.target.value })}
                 placeholder="/usr/bin/yt-dlp"
                 className="font-mono text-sm"
               />
@@ -148,20 +212,25 @@ export function SettingsView() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExport}>
               <Download className="w-4 h-4 mr-2" />
               Export Library
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleImport}>
+              <Upload className="w-4 h-4 mr-2" />
               Import Library
             </Button>
           </div>
         </section>
 
         {/* Save Button */}
-        <Button className="w-full glow-primary">
+        <Button 
+          className="w-full glow-primary" 
+          onClick={handleSave}
+          disabled={updateSettings.isPending}
+        >
           <Save className="w-4 h-4 mr-2" />
-          Save Settings
+          {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
     </div>
