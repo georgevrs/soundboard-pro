@@ -73,6 +73,23 @@ export const soundsApi = {
     return response.json();
   },
 
+  uploadAudio: async (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_BASE_URL}/sounds/${id}/audio`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
   ingest: (id: string) => apiCall(`/sounds/${id}/ingest`, {
     method: 'POST',
   }),

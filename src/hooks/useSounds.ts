@@ -32,6 +32,19 @@ export function useCreateSound() {
   });
 }
 
+export function useUploadAudio() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ soundId, file }: { soundId: string; file: File }) => 
+      soundsApi.uploadAudio(soundId, file),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sounds'] });
+      queryClient.invalidateQueries({ queryKey: ['sounds', variables.soundId] });
+    },
+  });
+}
+
 export function useUpdateSound() {
   const queryClient = useQueryClient();
   

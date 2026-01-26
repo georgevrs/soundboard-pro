@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCreateSound, useIngestSound } from '@/hooks/useSounds';
+import { useCreateSound, useIngestSound, useUploadAudio } from '@/hooks/useSounds';
 import { soundsApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { SourceType } from '@/types/sound';
@@ -26,6 +26,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
   const [volume, setVolume] = useState('80');
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [localFile, setLocalFile] = useState<File | null>(null);
   const [localFilePath, setLocalFilePath] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,9 +38,10 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setLocalFile(file);
       setLocalFilePath(file.name);
-      // Note: For local files, we'll need to handle file upload separately
-      // For now, we'll store the file path
+      // Store file name as source URL for now
+      // The file will be uploaded when creating the sound
       setSourceUrl(file.name);
     }
   };
@@ -87,7 +89,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       return;
     }
 
-    if (sourceType === 'LOCAL_FILE' && !localFilePath) {
+    if (sourceType === 'LOCAL_FILE' && !localFile) {
       toast({
         title: "Error",
         description: "Please select a local file",
@@ -117,26 +119,52 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       if (sourceType === 'DIRECT_URL' || sourceType === 'YOUTUBE') {
         soundData.source_url = sourceUrl.trim();
       } else if (sourceType === 'LOCAL_FILE') {
-        // For local files, store the file path
-        // In a real implementation, you'd upload the file first
-        soundData.source_url = localFilePath;
-        soundData.local_path = localFilePath;
+        // For local files, we need to upload the file
+        // Set a placeholder - will be updated after file upload
+        soundData.source_url = localFile?.name || localFilePath;
+        soundData.local_path = null; // Will be set after upload
       }
 
       const createdSound = await createSound.mutateAsync(soundData) as { id: string } | undefined;
       const soundId = createdSound?.id;
       
-      // Upload cover image if provided
+      if (!soundId) {
+        throw new Error("Failed to create sound - no ID returned");
+      }
+
+      let uploadSuccess = true;
+      let errorMessages: string[] = [];
+
+      // Upload audio file for LOCAL_FILE type (REQUIRED)
+      if (sourceType === 'LOCAL_FILE') {
+        if (!localFile) {
+          throw new Error("No file selected for local file sound");
+        }
+        
+        try {
+          await uploadAudio.mutateAsync({ soundId, file: localFile });
+        } catch (audioError: any) {
+          console.error('Failed to upload audio file:', audioError);
+          uploadSuccess = false;
+          errorMessages.push("Audio file upload failed");
+          // Delete the sound if audio upload fails (can't play without source)
+          try {
+            await soundsApi.delete(soundId);
+          } catch (deleteError) {
+            console.error('Failed to delete sound after upload failure:', deleteError);
+          }
+          throw new Error(`Failed to upload audio file: ${audioError.message || 'Unknown error'}`);
+        }
+      }
+      
+      // Upload cover image if provided (OPTIONAL)
       if (coverImage && soundId) {
         try {
           await soundsApi.uploadCover(soundId, coverImage);
         } catch (coverError: any) {
           console.error('Failed to upload cover:', coverError);
-          toast({
-            title: "Warning",
-            description: "Sound created but cover image upload failed",
-            variant: "default",
-          });
+          errorMessages.push("Cover image upload failed");
+          // Don't fail the whole operation for cover image
         }
       }
 
@@ -151,14 +179,22 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
         } catch (ingestError: any) {
           toast({
             title: "Partial Success",
-            description: "Sound created but YouTube download failed. You can retry later.",
+            description: "Sound created but YouTube download failed. You can retry later from the sound details.",
           });
         }
-      } else {
-        toast({
-          title: "Success",
-          description: "Sound created successfully",
-        });
+      } else if (uploadSuccess) {
+        // Show success message
+        if (errorMessages.length > 0) {
+          toast({
+            title: "Success",
+            description: `Sound created successfully. ${errorMessages.join('. ')}`,
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Sound created successfully",
+          });
+        }
       }
 
       // Reset form
@@ -166,6 +202,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       setDescription('');
       setTags('');
       setSourceUrl('');
+      setLocalFile(null);
       setLocalFilePath('');
       setVolume('80');
       setSourceType('DIRECT_URL');
@@ -186,7 +223,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Add New Sound</DialogTitle>
           <DialogDescription>
@@ -194,8 +231,9 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -368,9 +406,10 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                 Upload a cover image for this sound (JPG, PNG, etc.)
               </p>
             </div>
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="mt-4 flex-shrink-0">
             <Button
               type="button"
               variant="outline"

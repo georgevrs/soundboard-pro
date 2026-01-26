@@ -139,6 +139,40 @@ async def upload_cover(
     return sound
 
 
+@router.post("/{sound_id}/audio", response_model=SoundResponse)
+async def upload_audio(
+    sound_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Upload an audio file for a sound"""
+    sound = db.query(Sound).filter(Sound.id == sound_id).first()
+    if not sound:
+        raise HTTPException(status_code=404, detail="Sound not found")
+
+    if sound.source_type != "LOCAL_FILE":
+        raise HTTPException(
+            status_code=400, detail="Audio upload only available for LOCAL_FILE sounds"
+        )
+
+    # Determine extension
+    extension = "mp3"
+    if file.filename:
+        ext = file.filename.split(".")[-1].lower()
+        if ext in ["mp3", "wav", "ogg", "m4a", "flac", "opus", "webm"]:
+            extension = ext
+
+    # Save file
+    content = await file.read()
+    audio_path = storage_service.get_audio_path(str(sound_id), extension)
+    audio_path.write_bytes(content)
+
+    sound.local_path = str(audio_path)
+    db.commit()
+    db.refresh(sound)
+    return sound
+
+
 @router.post("/{sound_id}/ingest", response_model=SoundResponse)
 async def ingest_sound(sound_id: UUID, db: Session = Depends(get_db)):
     """Download/ingest a sound (for YouTube URLs)"""

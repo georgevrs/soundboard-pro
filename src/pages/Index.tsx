@@ -97,6 +97,34 @@ export default function Index() {
   };
 
   const handlePlaySound = async (sound: Sound) => {
+    // Validate sound has a source before attempting to play
+    if (sound.sourceType === 'LOCAL_FILE' && !sound.source) {
+      toast({
+        title: "Cannot Play Sound",
+        description: "This sound has no audio file. Please upload an audio file first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (sound.sourceType === 'YOUTUBE' && !sound.source) {
+      toast({
+        title: "Cannot Play Sound",
+        description: "YouTube audio not downloaded yet. Please ingest the sound first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (sound.sourceType === 'DIRECT_URL' && !sound.source) {
+      toast({
+        title: "Cannot Play Sound",
+        description: "This sound has no source URL configured.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       if (playingSound?.id === sound.id && isPlaying) {
         // Stop if already playing
