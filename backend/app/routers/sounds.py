@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
+from sqlalchemy.dialects.postgresql import array
 from typing import List, Optional
 from uuid import UUID
 from pathlib import Path
@@ -39,9 +40,10 @@ def list_sounds(
             )
         )
 
-    # Tag filter
+    # Tag filter - check if the tag string is in the tags array
+    # Use PostgreSQL array containment operator @> to check if array contains the value
     if tag:
-        query = query.filter(Sound.tags.contains([tag]))
+        query = query.filter(Sound.tags.op('@>')(array([tag])))
 
     # Source type filter
     if source_type:
