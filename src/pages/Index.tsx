@@ -7,7 +7,10 @@ import { ShortcutsView } from '@/components/soundboard/ShortcutsView';
 import { SettingsView } from '@/components/soundboard/SettingsView';
 import { EmptyState } from '@/components/soundboard/EmptyState';
 import { CreateSoundDialog } from '@/components/soundboard/CreateSoundDialog';
+import { EditSoundDialog } from '@/components/soundboard/EditSoundDialog';
+import { CreateShortcutDialog } from '@/components/soundboard/CreateShortcutDialog';
 import { DeleteSoundDialog } from '@/components/soundboard/DeleteSoundDialog';
+import { AppFooter } from '@/components/soundboard/AppFooter';
 import { Sound, Shortcut } from '@/types/sound';
 import { Grid, List, SortAsc, Moon, Sun, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +20,7 @@ import { useShortcuts, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useS
 import { usePlaySound, useStopSound, useToggleSound } from '@/hooks/usePlayback';
 import { useNowPlaying } from '@/hooks/usePlayback';
 import { toast } from '@/hooks/use-toast';
+import { useTranslation } from '@/lib/i18n';
 
 type ViewMode = 'library' | 'shortcuts' | 'settings';
 type LayoutMode = 'grid' | 'list';
@@ -33,10 +37,13 @@ export default function Index() {
   
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [createShortcutDialogOpen, setCreateShortcutDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [soundToDelete, setSoundToDelete] = useState<{ id: string; name: string } | null>(null);
   
   const [isDark, setIsDark] = useState(true);
+  const { language, setLanguage, t } = useTranslation();
 
   // API hooks
   const { data: sounds = [], isLoading: soundsLoading, error: soundsError } = useSounds({
@@ -106,7 +113,7 @@ export default function Index() {
     // Validate sound has a source before attempting to play
     if (sound.sourceType === 'LOCAL_FILE' && !sound.source) {
       toast({
-        title: "Cannot Play Sound",
+        title: t('toast.error'),
         description: "This sound has no audio file. Please upload an audio file first.",
         variant: "destructive",
       });
@@ -115,7 +122,7 @@ export default function Index() {
 
     if (sound.sourceType === 'YOUTUBE' && !sound.source) {
       toast({
-        title: "Cannot Play Sound",
+        title: t('toast.error'),
         description: "YouTube audio not downloaded yet. Please ingest the sound first.",
         variant: "destructive",
       });
@@ -124,7 +131,7 @@ export default function Index() {
 
     if (sound.sourceType === 'DIRECT_URL' && !sound.source) {
       toast({
-        title: "Cannot Play Sound",
+        title: t('toast.error'),
         description: "This sound has no source URL configured.",
         variant: "destructive",
       });
@@ -139,13 +146,13 @@ export default function Index() {
         // Play the sound
         await playMutation.mutateAsync({ soundId: sound.id, restart: false });
         toast({
-          title: "Playing sound",
+          title: t('toast.success'),
           description: sound.name,
         });
       }
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to play sound",
         variant: "destructive",
       });
@@ -157,12 +164,12 @@ export default function Index() {
       try {
         await stopMutation.mutateAsync(playingSound.id);
         toast({
-          title: "Stopped",
+          title: t('toast.success'),
           description: playingSound.name,
         });
       } catch (error: any) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: error.message || "Failed to stop sound",
           variant: "destructive",
         });
@@ -182,12 +189,12 @@ export default function Index() {
         },
       });
       toast({
-        title: shortcut.enabled ? "Shortcut disabled" : "Shortcut enabled",
+        title: t('toast.success'),
         description: `Hotkey: ${shortcut.hotkey}`,
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to toggle shortcut",
         variant: "destructive",
       });
@@ -201,12 +208,12 @@ export default function Index() {
     try {
       await deleteShortcut.mutateAsync(id);
       toast({
-        title: "Shortcut deleted",
+        title: t('toast.success'),
         description: `Removed hotkey: ${shortcut.hotkey}`,
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to delete shortcut",
         variant: "destructive",
       });
@@ -215,6 +222,18 @@ export default function Index() {
 
   const getShortcutForSound = (soundId: string) => 
     shortcuts.find(s => s.soundId === soundId);
+
+  const handleEditSound = () => {
+    if (selectedSound) {
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleBindShortcut = () => {
+    if (selectedSound) {
+      setCreateShortcutDialogOpen(true);
+    }
+  };
 
   const handleDeleteSound = (soundId: string) => {
     const sound = sounds.find(s => s.id === soundId);
@@ -230,7 +249,7 @@ export default function Index() {
     try {
       await deleteSound.mutateAsync(soundToDelete.id);
       toast({
-        title: "Sound deleted",
+        title: t('toast.success'),
         description: "The sound has been removed from your library.",
       });
       // Clear selection if deleted sound was selected
@@ -241,7 +260,7 @@ export default function Index() {
       setSoundToDelete(null);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to delete sound",
         variant: "destructive",
       });
@@ -296,7 +315,7 @@ export default function Index() {
               <div className="h-14 border-b border-border/50 px-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    {filteredSounds.length} sounds
+                    {t('toolbar.soundsCount', { count: filteredSounds.length })}
                   </span>
                   <Button
                     variant="outline"
@@ -305,7 +324,7 @@ export default function Index() {
                     className="ml-4"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Sound
+                    {t('toolbar.addSound')}
                   </Button>
                 </div>
                 
@@ -318,9 +337,9 @@ export default function Index() {
                       onChange={(e) => setSortMode(e.target.value as SortMode)}
                       className="text-sm bg-transparent text-foreground outline-none cursor-pointer"
                     >
-                      <option value="recent">Recent</option>
-                      <option value="name">Name</option>
-                      <option value="plays">Most Played</option>
+                      <option value="recent">{t('toolbar.sort.recent')}</option>
+                      <option value="name">{t('toolbar.sort.name')}</option>
+                      <option value="plays">{t('toolbar.sort.plays')}</option>
                     </select>
                   </div>
 
@@ -363,6 +382,16 @@ export default function Index() {
                       <Moon className="w-4 h-4" />
                     )}
                   </Button>
+
+                  {/* Language Toggle */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 px-2 text-xs font-semibold"
+                    onClick={() => setLanguage(language === 'en' ? 'el' : 'en')}
+                  >
+                    {language === 'en' ? t('lang.en') : t('lang.el')}
+                  </Button>
                 </div>
               </div>
 
@@ -397,6 +426,8 @@ export default function Index() {
                 {/* Inspector */}
                 <div className="w-80 border-l border-border/50">
                   <InspectorPanel
+                    onEdit={handleEditSound}
+                    onBindShortcut={handleBindShortcut}
                     sound={selectedSound}
                     shortcut={selectedSound ? getShortcutForSound(selectedSound.id) : undefined}
                     isPlaying={playingSound?.id === selectedSound?.id && isPlaying}
@@ -442,6 +473,20 @@ export default function Index() {
         onOpenChange={setCreateDialogOpen}
       />
 
+      {/* Edit Sound Dialog */}
+      <EditSoundDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        sound={selectedSound}
+      />
+
+      {/* Create Shortcut Dialog */}
+      <CreateShortcutDialog
+        open={createShortcutDialogOpen}
+        onOpenChange={setCreateShortcutDialogOpen}
+        sound={selectedSound}
+      />
+
       {/* Delete Sound Dialog */}
       {soundToDelete && (
         <DeleteSoundDialog
@@ -451,6 +496,9 @@ export default function Index() {
           onConfirm={confirmDeleteSound}
         />
       )}
+
+      {/* Footer */}
+      <AppFooter />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { TagPill } from './TagPill';
+import { useTranslation } from '@/lib/i18n';
 
 interface SidebarProps {
   searchQuery: string;
@@ -41,6 +42,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [tagsExpanded, setTagsExpanded] = useState(true);
   const [sourcesExpanded, setSourcesExpanded] = useState(true);
+  const { t } = useTranslation();
 
   const sources = [
     { id: 'DIRECT_URL', label: 'Direct URL', icon: Link },
@@ -57,7 +59,7 @@ export function Sidebar({
             <Music className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-foreground">KeySound</h1>
+            <h1 className="font-bold text-foreground">Soundboard</h1>
             <p className="text-[10px] text-muted-foreground">Commander</p>
           </div>
         </div>
@@ -66,7 +68,7 @@ export function Sidebar({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search sounds..."
+            placeholder={t('sidebar.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-9 bg-secondary/50 border-transparent focus:border-primary/50"
@@ -83,21 +85,21 @@ export function Sidebar({
             onClick={() => onViewChange('library')}
           >
             <Music className="w-4 h-4" />
-            <span>Sound Library</span>
+            <span>{t('sidebar.nav.library')}</span>
           </div>
           <div
             className={cn("sidebar-item", currentView === 'shortcuts' && "active")}
             onClick={() => onViewChange('shortcuts')}
           >
             <Keyboard className="w-4 h-4" />
-            <span>Shortcuts</span>
+            <span>{t('sidebar.nav.shortcuts')}</span>
           </div>
           <div
             className={cn("sidebar-item", currentView === 'settings' && "active")}
             onClick={() => onViewChange('settings')}
           >
             <Settings className="w-4 h-4" />
-            <span>Settings</span>
+            <span>{t('sidebar.nav.settings')}</span>
           </div>
         </div>
 
@@ -108,7 +110,7 @@ export function Sidebar({
             onClick={() => setSourcesExpanded(!sourcesExpanded)}
           >
             {sourcesExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Sources
+            {t('sidebar.sources')}
           </button>
           
           {sourcesExpanded && (
@@ -137,7 +139,7 @@ export function Sidebar({
             onClick={() => setTagsExpanded(!tagsExpanded)}
           >
             {tagsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Tags
+            {t('sidebar.tags')}
           </button>
           
           {tagsExpanded && (
@@ -159,7 +161,7 @@ export function Sidebar({
       <div className="p-4 border-t border-border/50">
         <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors glow-primary">
           <Plus className="w-4 h-4" />
-          Add Sound
+          {t('toolbar.addSound')}
         </button>
       </div>
     </aside>

@@ -51,6 +51,13 @@ export function transformSound(backend: BackendSound): Sound {
     source = backend.source_url || '';
   }
 
+  // Convert cover image path to URL
+  let coverImageUrl = '';
+  if (backend.cover_image_path) {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    coverImageUrl = `${API_BASE_URL}/sounds/${backend.id}/cover`;
+  }
+
   return {
     id: backend.id,
     name: backend.name,
@@ -58,7 +65,7 @@ export function transformSound(backend: BackendSound): Sound {
     tags: backend.tags || [],
     sourceType: backend.source_type,
     source: source,
-    coverImage: backend.cover_image_path || '',
+    coverImage: coverImageUrl,
     volume: backend.volume ?? 80,
     trimStartSec: backend.trim_start_sec ?? undefined,
     trimEndSec: backend.trim_end_sec ?? undefined,

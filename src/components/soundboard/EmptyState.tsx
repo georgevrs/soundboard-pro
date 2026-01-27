@@ -1,11 +1,14 @@
 import { Plus, Music, Keyboard, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/i18n';
 
 interface EmptyStateProps {
   onAddSound: () => void;
 }
 
 export function EmptyState({ onAddSound }: EmptyStateProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex-1 flex items-center justify-center p-8">
       <div className="text-center max-w-md">
@@ -14,15 +17,15 @@ export function EmptyState({ onAddSound }: EmptyStateProps) {
         </div>
         
         <h2 className="text-2xl font-bold text-foreground mb-2">
-          Welcome to KeySound Commander
+          {t('empty.title')}
         </h2>
         <p className="text-muted-foreground mb-8">
-          Your personal soundboard with global keyboard shortcuts. Add your first sound to get started!
+          {t('empty.subtitle')}
         </p>
 
         <Button onClick={onAddSound} size="lg" className="glow-primary mb-8">
           <Plus className="w-5 h-5 mr-2" />
-          Add Your First Sound
+          {t('empty.addFirst')}
         </Button>
 
         <div className="grid gap-4 text-left">
@@ -31,9 +34,9 @@ export function EmptyState({ onAddSound }: EmptyStateProps) {
               <span className="text-lg">🔗</span>
             </div>
             <div>
-              <p className="font-medium text-foreground">Direct URLs</p>
+              <p className="font-medium text-foreground">{t('empty.directTitle')}</p>
               <p className="text-sm text-muted-foreground">
-                Link to MP3, WAV, or OGG audio files
+                {t('empty.directDesc')}
               </p>
             </div>
           </div>
@@ -43,9 +46,9 @@ export function EmptyState({ onAddSound }: EmptyStateProps) {
               <span className="text-lg">▶️</span>
             </div>
             <div>
-              <p className="font-medium text-foreground">YouTube</p>
+              <p className="font-medium text-foreground">{t('empty.youtubeTitle')}</p>
               <p className="text-sm text-muted-foreground">
-                Auto-download audio from YouTube URLs
+                {t('empty.youtubeDesc')}
               </p>
             </div>
           </div>
@@ -55,9 +58,9 @@ export function EmptyState({ onAddSound }: EmptyStateProps) {
               <span className="text-lg">📁</span>
             </div>
             <div>
-              <p className="font-medium text-foreground">Local Files</p>
+              <p className="font-medium text-foreground">{t('empty.localTitle')}</p>
               <p className="text-sm text-muted-foreground">
-                Use audio files from your computer
+                {t('empty.localDesc')}
               </p>
             </div>
           </div>
@@ -66,11 +69,10 @@ export function EmptyState({ onAddSound }: EmptyStateProps) {
         <div className="mt-8 p-4 rounded-lg border border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2 text-primary mb-2">
             <Keyboard className="w-4 h-4" />
-            <span className="font-medium">Pro tip</span>
+            <span className="font-medium">{t('app.proTip')}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            After adding sounds, bind keyboard shortcuts to trigger them instantly — 
-            even when the app is running in the background!
+            {t('empty.proTipText')}
           </p>
         </div>
       </div>

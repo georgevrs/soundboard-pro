@@ -12,6 +12,7 @@ import { SourceType } from '@/types/sound';
 import { Image, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProgressDialog, ProgressStep } from './ProgressDialog';
+import { useTranslation } from '@/lib/i18n';
 
 interface CreateSoundDialogProps {
   open: boolean;
@@ -43,6 +44,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
   const createSound = useCreateSound();
   const ingestSound = useIngestSound();
   const uploadAudioMutation = useUploadAudio();
+  const { t } = useTranslation();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,7 +63,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       // Validate file type
       if (!file.type.startsWith('image/')) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: "Please select an image file (JPG, PNG, GIF, or WEBP)",
           variant: "destructive",
         });
@@ -72,7 +74,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: `File too large. Maximum size is 10MB, got ${(file.size / 1024 / 1024).toFixed(2)}MB`,
           variant: "destructive",
         });
@@ -81,7 +83,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
       if (file.size === 0) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: "Empty file selected",
           variant: "destructive",
         });
@@ -112,7 +114,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
     
     if (!name.trim()) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: "Name is required",
         variant: "destructive",
       });
@@ -121,7 +123,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
     if (sourceType === 'LOCAL_FILE' && !localFile) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: "Please select a local file",
         variant: "destructive",
       });
@@ -130,7 +132,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
     if (!sourceUrl.trim() && sourceType !== 'LOCAL_FILE') {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: "Source URL is required",
         variant: "destructive",
       });
@@ -143,7 +145,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       const end = parseFloat(trimEnd);
       if (isNaN(start) || isNaN(end) || start < 0 || end < 0) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: "Trim values must be valid positive numbers",
           variant: "destructive",
         });
@@ -151,7 +153,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       }
       if (end <= start) {
         toast({
-          title: "Error",
+          title: t('toast.error'),
           description: "Trim end must be greater than trim start",
           variant: "destructive",
         });
@@ -161,7 +163,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
     // Initialize progress steps based on source type
     const steps: ProgressStep[] = [];
-    steps.push({ id: 'create', label: 'Creating sound entry', status: 'pending' });
+    steps.push({ id: 'create', label: t('createSound.progressTitle'), status: 'pending' });
     
     if (sourceType === 'LOCAL_FILE') {
       steps.push({ id: 'upload-audio', label: 'Uploading audio file', status: 'pending' });
@@ -266,13 +268,13 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
           updateStepStatus('download', 'completed');
           setCurrentStepIndex(prev => prev + 1);
           toast({
-            title: "Success",
+            title: t('toast.success'),
             description: "Sound created and YouTube audio downloaded successfully",
           });
         } catch (ingestError: any) {
           updateStepStatus('download', 'error');
           toast({
-            title: "Partial Success",
+            title: t('toast.success'),
             description: "Sound created but YouTube download failed. You can retry later from the sound details.",
           });
           setCurrentStepIndex(prev => prev + 1);
@@ -281,12 +283,12 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
         // Show success message
         if (errorMessages.length > 0) {
           toast({
-            title: "Success",
+            title: t('toast.success'),
             description: `Sound created successfully. ${errorMessages.join('. ')}`,
           });
         } else {
           toast({
-            title: "Success",
+            title: t('toast.success'),
             description: "Sound created successfully",
           });
         }
@@ -319,7 +321,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
     } catch (error: any) {
       setShowProgress(false);
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to create sound",
         variant: "destructive",
       });
@@ -354,9 +356,9 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Add New Sound</DialogTitle>
+          <DialogTitle>{t('createSound.title')}</DialogTitle>
           <DialogDescription>
-            Create a new sound for your soundboard. You can add it from a URL, YouTube, or local file.
+            {t('createSound.description')}
           </DialogDescription>
         </DialogHeader>
         
@@ -364,47 +366,47 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
           <div className="flex-1 overflow-y-auto pr-2">
             <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name">{t('createSound.nameLabel')}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Air Horn"
+                placeholder={t('createSound.namePlaceholder')}
                 required
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('createSound.descriptionLabel')}</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
+                placeholder={t('createSound.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="tags">Tags</Label>
+              <Label htmlFor="tags">{t('createSound.tagsLabel')}</Label>
               <Input
                 id="tags"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="funny, alert, meme (comma-separated)"
+                placeholder={t('createSound.tagsPlaceholder')}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="sourceType">Source Type *</Label>
+              <Label htmlFor="sourceType">{t('createSound.sourceTypeLabel')}</Label>
               <Select value={sourceType} onValueChange={(value) => setSourceType(value as SourceType)}>
                 <SelectTrigger id="sourceType">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="DIRECT_URL">Direct URL</SelectItem>
-                  <SelectItem value="YOUTUBE">YouTube</SelectItem>
-                  <SelectItem value="LOCAL_FILE">Local File</SelectItem>
+                  <SelectItem value="DIRECT_URL">{t('createSound.sourceType.direct')}</SelectItem>
+                  <SelectItem value="YOUTUBE">{t('createSound.sourceType.youtube')}</SelectItem>
+                  <SelectItem value="LOCAL_FILE">{t('createSound.sourceType.local')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -412,18 +414,20 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
             {(sourceType === 'DIRECT_URL' || sourceType === 'YOUTUBE') && (
               <div className="grid gap-2">
                 <Label htmlFor="sourceUrl">
-                  {sourceType === 'YOUTUBE' ? 'YouTube URL *' : 'Audio URL *'}
+                  {sourceType === 'YOUTUBE' ? t('createSound.youtubeUrlLabel') : t('createSound.audioUrlLabel')}
                 </Label>
                 <Input
                   id="sourceUrl"
                   value={sourceUrl}
                   onChange={(e) => setSourceUrl(e.target.value)}
-                  placeholder={sourceType === 'YOUTUBE' ? 'https://youtube.com/watch?v=...' : 'https://example.com/sound.mp3'}
+                  placeholder={sourceType === 'YOUTUBE'
+                    ? t('createSound.youtubeUrlPlaceholder')
+                    : t('createSound.audioUrlPlaceholder')}
                   required
                 />
                 {sourceType === 'YOUTUBE' && (
                   <p className="text-xs text-muted-foreground">
-                    The audio will be downloaded automatically after creation.
+                    {t('createSound.youtubeHint')}
                   </p>
                 )}
               </div>
@@ -432,7 +436,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
             {sourceType === 'YOUTUBE' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="trimStart">Trim Start (seconds)</Label>
+                  <Label htmlFor="trimStart">{t('createSound.trimStartLabel')}</Label>
                   <Input
                     id="trimStart"
                     type="number"
@@ -443,11 +447,11 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                     placeholder="0.0"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Start playing from this time (optional)
+                    {t('createSound.trimStartHelp')}
                   </p>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="trimEnd">Trim End (seconds)</Label>
+                  <Label htmlFor="trimEnd">{t('createSound.trimEndLabel')}</Label>
                   <Input
                     id="trimEnd"
                     type="number"
@@ -458,7 +462,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                     placeholder="0.0"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Stop playing at this time (optional)
+                    {t('createSound.trimEndHelp')}
                   </p>
                 </div>
               </div>
@@ -466,7 +470,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
             {sourceType === 'LOCAL_FILE' && (
               <div className="grid gap-2">
-                <Label htmlFor="fileInput">Audio File *</Label>
+                <Label htmlFor="fileInput">{t('createSound.localFileLabel')}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     ref={fileInputRef}
@@ -483,22 +487,22 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                     className="w-full"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {localFilePath || 'Choose Audio File'}
+                    {localFilePath || t('createSound.localFileButton')}
                   </Button>
                 </div>
                 {localFilePath && (
                   <p className="text-xs text-muted-foreground">
-                    Selected: {localFilePath}
+                    {t('createSound.localFileSelected', { file: localFilePath })}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Supported formats: MP3, WAV, OGG, M4A, FLAC
+                  {t('createSound.localFileHelp')}
                 </p>
               </div>
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor="volume">Volume (0-100)</Label>
+              <Label htmlFor="volume">{t('createSound.volumeLabel')}</Label>
               <Input
                 id="volume"
                 type="number"
@@ -512,7 +516,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
 
             {/* Cover Image */}
             <div className="grid gap-2">
-              <Label htmlFor="coverInput">Cover Image (Optional)</Label>
+              <Label htmlFor="coverInput">{t('createSound.coverLabel')}</Label>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Input
@@ -530,7 +534,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                     className="flex-1"
                   >
                     <Image className="w-4 h-4 mr-2" />
-                    {coverImage ? 'Change Image' : 'Select Cover Image'}
+                    {coverImage ? t('createSound.coverChange') : t('createSound.coverSelect')}
                   </Button>
                   {coverImage && (
                     <Button
@@ -560,14 +564,14 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
                     <div className="text-center">
                       <Image className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
                       <p className="text-xs text-muted-foreground">
-                        No cover image selected
+                        {t('createSound.coverNone')}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Upload a cover image for this sound (JPG, PNG, etc.)
+                {t('createSound.coverHelp')}
               </p>
             </div>
             </div>
@@ -579,10 +583,10 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('createSound.cancel')}
             </Button>
             <Button type="submit" disabled={createSound.isPending}>
-              {createSound.isPending ? 'Creating...' : 'Create Sound'}
+              {createSound.isPending ? t('createSound.submitPending') : t('createSound.submitIdle')}
             </Button>
           </DialogFooter>
         </form>
@@ -591,7 +595,7 @@ export function CreateSoundDialog({ open, onOpenChange }: CreateSoundDialogProps
       {/* Progress Dialog */}
       <ProgressDialog
         open={showProgress}
-        title="Creating Sound"
+        title={t('createSound.progressTitle')}
         steps={progressSteps}
         currentStepIndex={currentStepIndex}
         overallProgress={calculateProgress()}

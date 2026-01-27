@@ -3,8 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 from app.db import get_db
-from app.models import Shortcut
+from app.models import Shortcut, Sound
 from app.schemas import ShortcutCreate, ShortcutUpdate, ShortcutResponse
+from app.services.system_shortcuts import system_shortcut_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/shortcuts", tags=["shortcuts"])
 
@@ -34,6 +38,19 @@ def create_shortcut(shortcut: ShortcutCreate, db: Session = Depends(get_db)):
     db.add(db_shortcut)
     db.commit()
     db.refresh(db_shortcut)
+    
+    # Register with system if enabled
+    if db_shortcut.enabled:
+        sound = db.query(Sound).filter(Sound.id == db_shortcut.sound_id).first()
+        sound_name = sound.name if sound else "Unknown"
+        system_shortcut_service.register_shortcut(
+            str(db_shortcut.id),
+            db_shortcut.hotkey,
+            str(db_shortcut.sound_id),
+            sound_name,
+            db_shortcut.action.lower()
+        )
+    
     return db_shortcut
 
 
@@ -83,6 +100,22 @@ def update_shortcut(
 
     db.commit()
     db.refresh(shortcut)
+    
+    # Re-register with system if enabled, or unregister if disabled
+    sound = db.query(Sound).filter(Sound.id == shortcut.sound_id).first()
+    sound_name = sound.name if sound else "Unknown"
+    
+    if shortcut.enabled:
+        system_shortcut_service.register_shortcut(
+            str(shortcut.id),
+            shortcut.hotkey,
+            str(shortcut.sound_id),
+            sound_name,
+            shortcut.action.lower()
+        )
+    else:
+        system_shortcut_service.unregister_shortcut(str(shortcut.id))
+    
     return shortcut
 
 
@@ -93,6 +126,11 @@ def delete_shortcut(shortcut_id: UUID, db: Session = Depends(get_db)):
     if not shortcut:
         raise HTTPException(status_code=404, detail="Shortcut not found")
 
+    shortcut_id = str(shortcut.id)
     db.delete(shortcut)
     db.commit()
+    
+    # Unregister from system
+    system_shortcut_service.unregister_shortcut(shortcut_id)
+    
     return None

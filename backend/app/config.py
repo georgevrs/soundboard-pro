@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     YTDLP_COOKIES_FROM_BROWSER: str = ""  # e.g., "chrome", "firefox", "edge" - empty to disable
     YTDLP_COOKIES_FILE: str = ""  # Path to cookies.txt file - empty to disable
     YTDLP_VERBOSE: bool = False  # Enable verbose logging for debugging
+    API_BASE_URL: str = "http://localhost:8000"  # Base URL for API (used in system shortcuts)
 
     class Config:
         env_file = ".env"

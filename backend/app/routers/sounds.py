@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import List, Optional
 from uuid import UUID
+from pathlib import Path
 from app.db import get_db
 from app.models import Sound
 from app.schemas import SoundCreate, SoundUpdate, SoundResponse
@@ -173,6 +175,38 @@ async def upload_cover(
     except Exception as e:
         logger.error(f"Failed to upload cover image for sound {sound_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to upload cover image: {str(e)}")
+
+
+@router.get("/{sound_id}/cover")
+async def get_cover_image(sound_id: UUID, db: Session = Depends(get_db)):
+    """Get cover image for a sound"""
+    sound = db.query(Sound).filter(Sound.id == sound_id).first()
+    if not sound:
+        raise HTTPException(status_code=404, detail="Sound not found")
+    
+    if not sound.cover_image_path:
+        raise HTTPException(status_code=404, detail="No cover image for this sound")
+    
+    cover_path = Path(sound.cover_image_path)
+    if not cover_path.exists():
+        raise HTTPException(status_code=404, detail="Cover image file not found")
+    
+    # Determine media type based on extension
+    extension = cover_path.suffix.lower()
+    media_type_map = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+    }
+    media_type = media_type_map.get(extension, 'image/jpeg')
+    
+    return FileResponse(
+        str(cover_path),
+        media_type=media_type,
+        filename=cover_path.name
+    )
 
 
 @router.post("/{sound_id}/audio", response_model=SoundResponse)

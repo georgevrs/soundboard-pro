@@ -6,10 +6,12 @@ import { Slider } from '@/components/ui/slider';
 import { useState, useEffect } from 'react';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { toast } from '@/hooks/use-toast';
+import { useTranslation } from '@/lib/i18n';
 
 export function SettingsView() {
   const { data: settingsData, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
+  const { t } = useTranslation();
   
   const [settings, setSettings] = useState({
     audioOutputDevice: '',
@@ -45,12 +47,12 @@ export function SettingsView() {
         allowOverlappingSounds: settings.allowOverlappingSounds,
       });
       toast({
-        title: "Success",
-        description: "Settings saved successfully",
+        title: t('toast.success'),
+        description: t('settings.toastSaved'),
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t('toast.error'),
         description: error.message || "Failed to save settings",
         variant: "destructive",
       });
@@ -59,22 +61,22 @@ export function SettingsView() {
 
   const handleExport = () => {
     toast({
-      title: "Coming Soon",
-      description: "Export functionality will be available soon",
+      title: t('settings.toastExportTitle'),
+      description: t('settings.toastExportDesc'),
     });
   };
 
   const handleImport = () => {
     toast({
-      title: "Coming Soon",
-      description: "Import functionality will be available soon",
+      title: t('settings.toastImportTitle'),
+      description: t('settings.toastImportDesc'),
     });
   };
 
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-muted-foreground">Loading settings...</p>
+        <p className="text-muted-foreground">{t('settings.loading')}</p>
       </div>
     );
   }
@@ -88,9 +90,9 @@ export function SettingsView() {
             <SettingsIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Settings</h1>
+            <h1 className="text-xl font-bold text-foreground">{t('settings.title')}</h1>
             <p className="text-sm text-muted-foreground">
-              Configure app behavior and paths
+              {t('settings.subtitle')}
             </p>
           </div>
         </div>
@@ -102,29 +104,29 @@ export function SettingsView() {
         <section className="glass-card p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Volume2 className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Audio</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('settings.audioSection')}</h2>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Audio Output Device
+                {t('settings.audioDeviceLabel')}
               </label>
               <Input
                 value={settings.audioOutputDevice}
                 onChange={(e) => setSettings({ ...settings, audioOutputDevice: e.target.value })}
-                placeholder="pipewire/alsa_output... (leave empty for default)"
+                placeholder={t('settings.audioDevicePlaceholder')}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Device string passed to mpv's --audio-device flag
+                {t('settings.audioDeviceHelp')}
               </p>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">
-                  Default Volume
+                  {t('settings.defaultVolumeLabel')}
                 </label>
                 <span className="text-sm text-muted-foreground">{settings.defaultVolume}%</span>
               </div>
@@ -138,9 +140,9 @@ export function SettingsView() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">Stop Previous on Play</p>
+                <p className="text-sm font-medium text-foreground">{t('settings.stopPreviousTitle')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Stop any playing sound when a new one starts
+                  {t('settings.stopPreviousDesc')}
                 </p>
               </div>
               <Switch
@@ -151,9 +153,9 @@ export function SettingsView() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">Allow Overlapping</p>
+                <p className="text-sm font-medium text-foreground">{t('settings.allowOverlappingTitle')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Allow multiple sounds to play simultaneously
+                  {t('settings.allowOverlappingDesc')}
                 </p>
               </div>
               <Switch
@@ -168,37 +170,37 @@ export function SettingsView() {
         <section className="glass-card p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Terminal className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Command Paths</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('settings.pathsSection')}</h2>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                mpv Path
+                {t('settings.mpvPathLabel')}
               </label>
               <Input
                 value={settings.mpvPath}
                 onChange={(e) => setSettings({ ...settings, mpvPath: e.target.value })}
-                placeholder="/usr/bin/mpv"
+                placeholder={t('settings.mpvPathPlaceholder')}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Path to mpv executable. Use "mpv" if it's in your PATH
+                {t('settings.mpvPathHelp')}
               </p>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                yt-dlp Path
+                {t('settings.ytdlpPathLabel')}
               </label>
               <Input
                 value={settings.youtubeDownloadTool}
                 onChange={(e) => setSettings({ ...settings, youtubeDownloadTool: e.target.value })}
-                placeholder="/usr/bin/yt-dlp"
+                placeholder={t('settings.ytdlpPathPlaceholder')}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Path to yt-dlp for downloading YouTube audio
+                {t('settings.ytdlpPathHelp')}
               </p>
             </div>
           </div>
@@ -208,17 +210,17 @@ export function SettingsView() {
         <section className="glass-card p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Download className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Data Management</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('settings.dataSection')}</h2>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" onClick={handleExport}>
               <Download className="w-4 h-4 mr-2" />
-              Export Library
+              {t('settings.exportLibrary')}
             </Button>
             <Button variant="outline" onClick={handleImport}>
               <Upload className="w-4 h-4 mr-2" />
-              Import Library
+              {t('settings.importLibrary')}
             </Button>
           </div>
         </section>
@@ -230,7 +232,7 @@ export function SettingsView() {
           disabled={updateSettings.isPending}
         >
           <Save className="w-4 h-4 mr-2" />
-          {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
+          {updateSettings.isPending ? t('settings.saving') : t('settings.save')}
         </Button>
       </div>
     </div>

@@ -219,10 +219,14 @@ class PlayerService:
 
     def stop(self, sound_id: UUID) -> bool:
         """Stop playback for a specific sound"""
-        if sound_id in self.sessions:
-            session = self.sessions[sound_id]
-            session.stop()
-            del self.sessions[sound_id]
+        # Use pop() to safely remove - handles race condition where
+        # _wait_for_completion may have already removed the session
+        session = self.sessions.pop(sound_id, None)
+        if session:
+            try:
+                session.stop()
+            except Exception as e:
+                logger.error(f"Error stopping session for sound {sound_id}: {e}")
             return True
         return False
 

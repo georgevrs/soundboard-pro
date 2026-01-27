@@ -28,6 +28,8 @@ interface InspectorPanelProps {
   isPlaying: boolean;
   onPlay: () => void;
   onStop: () => void;
+  onEdit?: () => void;
+  onBindShortcut?: () => void;
   onDelete?: () => void;
   onClose: () => void;
 }
@@ -38,10 +40,25 @@ export function InspectorPanel({
   isPlaying,
   onPlay,
   onStop,
+  onEdit,
+  onBindShortcut,
   onDelete,
   onClose,
 }: InspectorPanelProps) {
+  // Handle bind shortcut button click
+  const handleBindShortcutClick = () => {
+    if (onBindShortcut) {
+      onBindShortcut();
+    }
+  };
   const [volume, setVolume] = useState(sound?.volume ?? 75);
+  
+  // Handle edit button click
+  const handleEditClick = () => {
+    if (onEdit) {
+      onEdit();
+    }
+  };
 
   if (!sound) {
     return (
@@ -99,7 +116,12 @@ export function InspectorPanel({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={handleEditClick}
+            >
               <Edit3 className="w-4 h-4" />
             </Button>
             <Button 
@@ -176,7 +198,11 @@ export function InspectorPanel({
               </span>
             </div>
           ) : (
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleBindShortcutClick}
+            >
               <Keyboard className="w-4 h-4 mr-2" />
               Bind Shortcut
             </Button>

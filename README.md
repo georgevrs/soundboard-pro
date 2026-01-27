@@ -1,73 +1,139 @@
-# Welcome to your Lovable project
+# KeySound Commander
 
-## Project info
+A local-first desktop-style web app for managing and playing sounds via global keyboard shortcuts.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- 🎵 **Sound Management**: Add sounds from URLs, YouTube, or local files
+- ⌨️ **Global Keyboard Shortcuts**: System-level shortcuts that work even when the app is closed
+- 🎨 **Modern UI**: Beautiful React + TypeScript interface with shadcn-ui components
+- 🐘 **PostgreSQL**: Robust database with SQLAlchemy 2.0 and Alembic migrations
+- 🎬 **Audio Playback**: Uses `mpv` for high-quality audio playback
+- 📥 **YouTube Integration**: Download and convert YouTube videos to audio
+- 🖼️ **Cover Images**: Upload custom cover art for your sounds
+- 🏷️ **Tags & Organization**: Organize sounds with tags and search
 
-There are several ways of editing your application.
+## Quick Start (Zero Configuration)
 
-**Use Lovable**
+### First Time Setup
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+```bash
+# Make scripts executable (if needed)
+chmod +x setup.sh run.sh
 
-Changes made via Lovable will be committed automatically to this repo.
+# Run automated setup (installs everything)
+./setup.sh
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Start the application
+./run.sh
 ```
 
-**Edit a file directly in GitHub**
+That's it! The setup script will:
+- ✅ Install all system dependencies (Python, Node.js, Docker, mpv, yt-dlp)
+- ✅ Set up Python virtual environment
+- ✅ Install all Python and Node.js dependencies
+- ✅ Configure PostgreSQL database
+- ✅ Run database migrations
+- ✅ Auto-detect audio devices
+- ✅ Create all necessary directories
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Running the App
 
-**Use GitHub Codespaces**
+```bash
+./run.sh
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+This will:
+- ✅ Start PostgreSQL (if not running)
+- ✅ Start the backend API server
+- ✅ Start the frontend development server
+- ✅ Open the app at http://localhost:8080
 
-## What technologies are used for this project?
+Press `Ctrl+C` to stop all services.
 
-This project is built with:
+## Manual Setup (Advanced)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+If you prefer manual setup, see the [backend setup guide](backend/README.md).
 
-## How can I deploy this project?
+## System Requirements
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- **OS**: Linux (Ubuntu/Debian/Arch recommended)
+- **Python**: 3.11 or higher
+- **Node.js**: 18 or higher
+- **Docker**: For PostgreSQL (or install PostgreSQL manually)
+- **mpv**: Audio player
+- **yt-dlp**: For YouTube downloads
+- **gsettings**: For system-level keyboard shortcuts (GNOME)
 
-## Can I connect a custom domain to my Lovable project?
+## Project Structure
 
-Yes, you can!
+```
+soundboard/
+├── backend/           # Python FastAPI backend
+│   ├── app/          # Application code
+│   ├── alembic/     # Database migrations
+│   └── storage/     # Audio files and covers
+├── src/              # React frontend
+├── setup.sh          # Automated setup script
+└── run.sh            # Application launcher
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## API Endpoints
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **Frontend**: http://localhost:8080
+
+## Keyboard Shortcuts
+
+Shortcuts are registered at the system level using GNOME's `gsettings`. They work globally, even when the app is closed.
+
+To create a shortcut:
+1. Select a sound in the app
+2. Click "Bind Shortcut" in the inspector panel
+3. Press your desired key combination (e.g., Ctrl+Alt+1)
+4. The shortcut is now registered system-wide!
+
+## Troubleshooting
+
+### Docker Permission Issues
+
+```bash
+sudo usermod -aG docker $USER
+# Then log out and log back in
+```
+
+### PostgreSQL Not Starting
+
+```bash
+# Check if port 5433 is available
+sudo lsof -i :5433
+
+# Or change the port in docker-compose.yml
+```
+
+### Audio Not Playing
+
+```bash
+# Check mpv installation
+mpv --version
+
+# Test audio device
+pactl list short sinks
+
+# Update DEFAULT_OUTPUT_DEVICE in backend/.env
+```
+
+### System Shortcuts Not Working
+
+- Ensure `gsettings` is available (GNOME desktop)
+- Check backend logs for shortcut registration errors
+- Verify `API_BASE_URL` in `backend/.env` is correct
+
+## Development
+
+See [backend/README.md](backend/README.md) for development setup and API documentation.
+
+## License
+
+MIT
