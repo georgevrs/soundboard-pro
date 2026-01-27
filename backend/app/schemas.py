@@ -16,6 +16,9 @@ class SoundBase(BaseModel):
     trim_start_sec: Optional[float] = None
     trim_end_sec: Optional[float] = None
     output_device: Optional[str] = None
+    ingest_status: Optional[str] = Field(None, pattern="^(PENDING|IN_PROGRESS|READY|FAILED)$")
+    ingest_retry_count: Optional[int] = Field(None, ge=0)
+    last_error: Optional[str] = None
 
 
 class SoundCreate(SoundBase):

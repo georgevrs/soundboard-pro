@@ -22,6 +22,10 @@ class Sound(Base):
     trim_end_sec = Column(REAL, nullable=True)
     output_device = Column(Text, nullable=True)  # per-sound override
     play_count = Column(Integer, nullable=False, default=0)
+    # Ingest status tracking (for YouTube downloads)
+    ingest_status = Column(Text, nullable=True)  # PENDING, IN_PROGRESS, READY, FAILED
+    ingest_retry_count = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)  # Last error message if ingest failed
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -30,6 +34,7 @@ class Sound(Base):
     __table_args__ = (
         CheckConstraint("source_type IN ('DIRECT_URL', 'YOUTUBE', 'LOCAL_FILE')", name="check_source_type"),
         CheckConstraint("volume IS NULL OR (volume >= 0 AND volume <= 100)", name="check_volume_range"),
+        CheckConstraint("ingest_status IS NULL OR ingest_status IN ('PENDING', 'IN_PROGRESS', 'READY', 'FAILED')", name="check_ingest_status"),
     )
 
 

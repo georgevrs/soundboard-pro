@@ -1,8 +1,12 @@
 import subprocess
 import asyncio
+import os
+import tempfile
+import time
 from typing import Dict, Optional
 from datetime import datetime
 from uuid import UUID
+from pathlib import Path
 import logging
 from app.config import settings
 from app.models import Sound, Settings as SettingsModel
@@ -52,29 +56,41 @@ class PlayerService:
         trim_end: Optional[float] = None,
     ) -> list:
         """Build mpv command with all options"""
-        cmd = [settings.MPV_PATH, "--no-video"]
+        mpv_path = settings.MPV_PATH
+        cmd = [mpv_path, "--no-video"]
+        
+        # Verify mpv exists
+        if not os.path.exists(mpv_path) and mpv_path == "mpv":
+            # Try to find mpv in PATH
+            import shutil
+            mpv_in_path = shutil.which("mpv")
+            if mpv_in_path:
+                cmd[0] = mpv_in_path
+                logger.info(f"Found mpv in PATH: {mpv_in_path}")
+            else:
+                logger.error(f"mpv not found at {mpv_path} and not in PATH")
 
-        # Audio device
+        # Audio device (mpv requires --audio-device=value format)
         device = output_device or settings.DEFAULT_OUTPUT_DEVICE
-        if device:
-            cmd.extend(["--audio-device", device])
+        if device and device.strip():  # Only add if device is set and not empty
+            cmd.append(f"--audio-device={device.strip()}")
 
-        # Volume
+        # Volume (mpv requires --volume=value format)
         vol = volume if volume is not None else settings.DEFAULT_VOLUME
         if vol is not None:
-            cmd.extend(["--volume", str(vol)])
+            cmd.append(f"--volume={vol}")
 
-        # Trimming
+        # Trimming (mpv requires --start=value and --length=value format)
         if trim_start is not None:
-            cmd.extend(["--start", str(trim_start)])
+            cmd.append(f"--start={trim_start}")
         
         if trim_end is not None:
             if trim_start is not None:
                 # Calculate length
                 length = trim_end - trim_start
-                cmd.extend(["--length", str(length)])
+                cmd.append(f"--length={length}")
             else:
-                cmd.extend(["--length", str(trim_end)])
+                cmd.append(f"--length={trim_end}")
 
         # Source (file or URL)
         cmd.append(source)
@@ -124,30 +140,80 @@ class PlayerService:
         )
 
         logger.info(f"Playing sound {sound_id} with command: {' '.join(cmd)}")
+        logger.info(f"Source file/URL: {source}")
+        
+        # Check if local file exists
+        if sound.source_type == "LOCAL_FILE" or (sound.source_type == "YOUTUBE" and sound.local_path):
+            source_path = Path(source)
+            if not source_path.exists():
+                logger.error(f"Source file does not exist: {source}")
+                raise FileNotFoundError(f"Audio file not found: {source}")
+            logger.info(f"Source file exists: {source_path} ({source_path.stat().st_size} bytes)")
 
         # Spawn mpv process
         try:
+            # Capture stderr to log errors
+            stderr_file = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.log')
+            stderr_path = stderr_file.name
+            stderr_file.close()
+            
+            logger.info(f"Executing mpv command: {' '.join(cmd)}")
             process = await asyncio.to_thread(
                 subprocess.Popen,
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=open(stderr_path, 'w'),
             )
+            
+            # Check if process started successfully
+            await asyncio.sleep(0.2)  # Brief wait to check if process crashed immediately
+            if process.poll() is not None:
+                # Process exited immediately - read stderr
+                with open(stderr_path, 'r') as f:
+                    stderr_output = f.read()
+                logger.error(f"mpv process exited immediately with code {process.returncode}")
+                logger.error(f"mpv stderr: {stderr_output}")
+                os.unlink(stderr_path)
+                raise RuntimeError(f"mpv failed to start: {stderr_output}")
+            
+            logger.info(f"mpv process started successfully with PID {process.pid}")
             
             session = PlaybackSession(sound_id, sound.name, process)
             self.sessions[sound_id] = session
             
             # Clean up when done (non-blocking)
-            asyncio.create_task(self._wait_for_completion(sound_id, process))
+            asyncio.create_task(self._wait_for_completion(sound_id, process, stderr_path))
             
             return session
+        except FileNotFoundError:
+            logger.error(f"mpv executable not found at: {settings.MPV_PATH}")
+            raise RuntimeError(f"mpv not found. Please install mpv or set MPV_PATH in settings.")
         except Exception as e:
-            logger.error(f"Failed to start playback for sound {sound_id}: {e}")
+            logger.error(f"Failed to start playback for sound {sound_id}: {e}", exc_info=True)
             raise
 
-    async def _wait_for_completion(self, sound_id: UUID, process: subprocess.Popen):
+    async def _wait_for_completion(self, sound_id: UUID, process: subprocess.Popen, stderr_path: str = None):
         """Wait for process to complete and clean up"""
-        await asyncio.to_thread(process.wait)
+        return_code = await asyncio.to_thread(process.wait)
+        
+        # Log stderr if process failed
+        if return_code != 0 and stderr_path:
+            try:
+                with open(stderr_path, 'r') as f:
+                    stderr_output = f.read()
+                if stderr_output:
+                    logger.warning(f"mpv process exited with code {return_code} for sound {sound_id}")
+                    logger.warning(f"mpv stderr: {stderr_output}")
+            except Exception:
+                pass
+            finally:
+                # Clean up log file
+                try:
+                    import os
+                    os.unlink(stderr_path)
+                except Exception:
+                    pass
+        
         if sound_id in self.sessions:
             del self.sessions[sound_id]
 

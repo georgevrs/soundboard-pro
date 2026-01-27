@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { Play, Pause, MoreVertical, Volume2, Keyboard } from 'lucide-react';
+import { Play, Pause, MoreVertical, Volume2, Keyboard, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sound, Shortcut } from '@/types/sound';
 import { HotkeyBadge } from './HotkeyBadge';
 import { TagPill } from './TagPill';
 import { WaveformVisualizer } from './WaveformVisualizer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface SoundCardProps {
   sound: Sound;
@@ -13,6 +19,7 @@ interface SoundCardProps {
   isSelected?: boolean;
   onPlay: () => void;
   onSelect: () => void;
+  onDelete?: () => void;
 }
 
 export function SoundCard({ 
@@ -21,7 +28,8 @@ export function SoundCard({
   isPlaying = false,
   isSelected = false,
   onPlay, 
-  onSelect 
+  onSelect,
+  onDelete
 }: SoundCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -103,12 +111,30 @@ export function SoundCard({
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-foreground truncate">{sound.name}</h3>
-          <button 
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="w-4 h-4 text-muted-foreground" />
-          </button>
+          {onDelete && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         
         <p className="text-sm text-muted-foreground line-clamp-2">

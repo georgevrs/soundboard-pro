@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     STOP_PREVIOUS_ON_PLAY: bool = True
     ALLOW_OVERLAPPING: bool = False
     CORS_ORIGINS: str = "http://localhost:8080,http://localhost:5173,http://localhost:3000"
+    # YouTube download settings
+    YTDLP_COOKIES_FROM_BROWSER: str = ""  # e.g., "chrome", "firefox", "edge" - empty to disable
+    YTDLP_COOKIES_FILE: str = ""  # Path to cookies.txt file - empty to disable
+    YTDLP_VERBOSE: bool = False  # Enable verbose logging for debugging
 
     class Config:
         env_file = ".env"

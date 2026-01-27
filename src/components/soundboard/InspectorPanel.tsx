@@ -28,6 +28,7 @@ interface InspectorPanelProps {
   isPlaying: boolean;
   onPlay: () => void;
   onStop: () => void;
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +38,7 @@ export function InspectorPanel({
   isPlaying,
   onPlay,
   onStop,
+  onDelete,
   onClose,
 }: InspectorPanelProps) {
   const [volume, setVolume] = useState(sound?.volume ?? 75);
@@ -100,7 +102,12 @@ export function InspectorPanel({
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <Edit3 className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>

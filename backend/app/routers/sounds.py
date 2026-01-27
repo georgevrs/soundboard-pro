@@ -122,21 +122,57 @@ async def upload_cover(
     if not sound:
         raise HTTPException(status_code=404, detail="Sound not found")
 
-    # Determine extension
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type. Expected image, got: {file.content_type}"
+        )
+
+    # Determine extension from filename or content type
     extension = "jpg"
     if file.filename:
         ext = file.filename.split(".")[-1].lower()
         if ext in ["jpg", "jpeg", "png", "gif", "webp"]:
             extension = ext
+    elif file.content_type:
+        # Fallback to content type
+        content_type_map = {
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        }
+        extension = content_type_map.get(file.content_type, "jpg")
 
-    # Save file
-    content = await file.read()
-    cover_path = storage_service.save_cover_image(str(sound_id), content, extension)
+    try:
+        # Read and validate file size (max 10MB)
+        content = await file.read()
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size is 10MB, got {len(content) / 1024 / 1024:.2f}MB"
+            )
 
-    sound.cover_image_path = cover_path
-    db.commit()
-    db.refresh(sound)
-    return sound
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Empty file provided")
+
+        # Save file
+        logger.info(f"Uploading cover image for sound {sound_id}, size: {len(content)} bytes, type: {extension}")
+        cover_path = storage_service.save_cover_image(str(sound_id), content, extension)
+
+        sound.cover_image_path = cover_path
+        db.commit()
+        db.refresh(sound)
+        
+        logger.info(f"Successfully uploaded cover image for sound {sound_id} to {cover_path}")
+        return sound
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to upload cover image for sound {sound_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload cover image: {str(e)}")
 
 
 @router.post("/{sound_id}/audio", response_model=SoundResponse)
@@ -191,22 +227,67 @@ async def ingest_sound(sound_id: UUID, db: Session = Depends(get_db)):
         )
 
     if sound.local_path and storage_service.file_exists(sound.local_path):
-        # Already downloaded
+        # Already downloaded - mark as READY
+        if sound.ingest_status != "READY":
+            sound.ingest_status = "READY"
+            sound.last_error = None
+            db.commit()
         return sound
 
     # Validate YouTube URL
     if not youtube_service.validate_youtube_url(sound.source_url):
         raise HTTPException(status_code=400, detail="Invalid YouTube URL")
 
+    # Update status to IN_PROGRESS
+    sound.ingest_status = "IN_PROGRESS"
+    sound.last_error = None
+    db.commit()
+
     try:
-        # Download audio
-        local_path = await youtube_service.download_audio(
+        # Download audio (returns dict with file path and metadata)
+        result = await youtube_service.download_audio(
             sound.source_url, str(sound_id)
         )
-        sound.local_path = local_path
+        sound.local_path = result["file"]
+        sound.ingest_status = "READY"
+        sound.last_error = None
+        sound.ingest_retry_count = 0  # Reset retry count on success
+        
+        # Optionally update metadata from download (title, duration, etc.)
+        metadata = result.get("metadata", {})
+        if metadata.get("title") and not sound.description:
+            # Use video title as description if none exists
+            sound.description = metadata["title"]
+        
         db.commit()
         db.refresh(sound)
         return sound
     except Exception as e:
-        logger.error(f"Failed to ingest sound {sound_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to download audio: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Failed to ingest sound {sound_id}: {error_msg}")
+        
+        # Mark as FAILED and store error
+        sound.ingest_status = "FAILED"
+        sound.last_error = error_msg[:500]  # Limit error message length
+        sound.ingest_retry_count = (sound.ingest_retry_count or 0) + 1
+        db.commit()
+        
+        # Provide helpful error message based on retry count
+        if sound.ingest_retry_count >= 3:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"Download failed after {sound.ingest_retry_count} attempts. "
+                    f"Error: {error_msg[:200]}\n\n"
+                    "RECOMMENDATIONS:\n"
+                    "1. Enable cookies: Set YTDLP_COOKIES_FROM_BROWSER=chrome in .env\n"
+                    "2. Update yt-dlp: pip install -U yt-dlp\n"
+                    "3. Try a different video URL\n"
+                    "4. Check if video is region/age-restricted"
+                )
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to download audio (attempt {sound.ingest_retry_count}): {error_msg[:300]}"
+            )

@@ -7,11 +7,12 @@ import { ShortcutsView } from '@/components/soundboard/ShortcutsView';
 import { SettingsView } from '@/components/soundboard/SettingsView';
 import { EmptyState } from '@/components/soundboard/EmptyState';
 import { CreateSoundDialog } from '@/components/soundboard/CreateSoundDialog';
+import { DeleteSoundDialog } from '@/components/soundboard/DeleteSoundDialog';
 import { Sound, Shortcut } from '@/types/sound';
 import { Grid, List, SortAsc, Moon, Sun, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useSounds } from '@/hooks/useSounds';
+import { useSounds, useDeleteSound } from '@/hooks/useSounds';
 import { useShortcuts, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useShortcuts';
 import { usePlaySound, useStopSound, useToggleSound } from '@/hooks/usePlayback';
 import { useNowPlaying } from '@/hooks/usePlayback';
@@ -32,6 +33,8 @@ export default function Index() {
   
   const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [soundToDelete, setSoundToDelete] = useState<{ id: string; name: string } | null>(null);
   
   const [isDark, setIsDark] = useState(true);
 
@@ -54,6 +57,9 @@ export default function Index() {
   // Shortcut mutations
   const updateShortcut = useUpdateShortcut();
   const deleteShortcut = useDeleteShortcut();
+  
+  // Sound mutations
+  const deleteSound = useDeleteSound();
 
   // Get all unique tags from sounds
   const allTags = useMemo(() => {
@@ -210,6 +216,38 @@ export default function Index() {
   const getShortcutForSound = (soundId: string) => 
     shortcuts.find(s => s.soundId === soundId);
 
+  const handleDeleteSound = (soundId: string) => {
+    const sound = sounds.find(s => s.id === soundId);
+    if (!sound) return;
+    
+    setSoundToDelete({ id: soundId, name: sound.name });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSound = async () => {
+    if (!soundToDelete) return;
+    
+    try {
+      await deleteSound.mutateAsync(soundToDelete.id);
+      toast({
+        title: "Sound deleted",
+        description: "The sound has been removed from your library.",
+      });
+      // Clear selection if deleted sound was selected
+      if (selectedSound?.id === soundToDelete.id) {
+        setSelectedSound(null);
+      }
+      setDeleteDialogOpen(false);
+      setSoundToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete sound",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Show loading state
   if (soundsLoading || shortcutsLoading) {
     return (
@@ -349,6 +387,7 @@ export default function Index() {
                           isSelected={selectedSound?.id === sound.id}
                           onPlay={() => handlePlaySound(sound)}
                           onSelect={() => setSelectedSound(sound)}
+                          onDelete={() => handleDeleteSound(sound.id)}
                         />
                       ))}
                     </div>
@@ -363,6 +402,7 @@ export default function Index() {
                     isPlaying={playingSound?.id === selectedSound?.id && isPlaying}
                     onPlay={() => selectedSound && handlePlaySound(selectedSound)}
                     onStop={handleStopSound}
+                    onDelete={selectedSound ? () => handleDeleteSound(selectedSound.id) : undefined}
                     onClose={() => setSelectedSound(null)}
                   />
                 </div>
@@ -401,6 +441,16 @@ export default function Index() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      {/* Delete Sound Dialog */}
+      {soundToDelete && (
+        <DeleteSoundDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          soundName={soundToDelete.name}
+          onConfirm={confirmDeleteSound}
+        />
+      )}
     </div>
   );
 }

@@ -141,3 +141,46 @@ def get_now_playing(db: Session = Depends(get_db)):
     """Get list of currently playing sounds"""
     playing = player_service.get_now_playing()
     return playing
+
+
+@router.get("/test-mpv")
+async def test_mpv(db: Session = Depends(get_db)):
+    """Test if mpv is working"""
+    import subprocess
+    from app.routers.settings import get_or_create_settings
+    
+    settings = get_or_create_settings(db)
+    
+    # Test mpv version
+    try:
+        result = subprocess.run(
+            [settings.mpv_path, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        version_info = result.stdout.split('\n')[0] if result.stdout else "Unknown"
+    except FileNotFoundError:
+        return {
+            "mpv_found": False,
+            "error": f"mpv not found at: {settings.mpv_path}",
+            "suggestion": "Install mpv: sudo apt install mpv"
+        }
+    except Exception as e:
+        return {
+            "mpv_found": False,
+            "error": str(e)
+        }
+    
+    # Test audio device
+    audio_device_info = "Not set"
+    if settings.default_output_device:
+        audio_device_info = settings.default_output_device
+    
+    return {
+        "mpv_found": True,
+        "mpv_path": settings.mpv_path,
+        "mpv_version": version_info,
+        "default_audio_device": audio_device_info,
+        "default_volume": settings.default_volume,
+    }
