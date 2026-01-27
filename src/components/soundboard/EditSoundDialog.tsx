@@ -34,6 +34,7 @@ export function EditSoundDialog({ open, onOpenChange, sound }: EditSoundDialogPr
   
   const updateSound = useUpdateSound();
   const uploadAudioMutation = useUploadAudio();
+  const queryClient = useQueryClient();
 
   // Initialize form with sound data
   useEffect(() => {

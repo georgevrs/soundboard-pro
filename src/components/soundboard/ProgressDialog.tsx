@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -29,10 +29,12 @@ export function ProgressDialog({
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         <div className="space-y-6">
-          {/* Header */}
+          {/* Current Step Info */}
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">{title}</h3>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 {currentStep?.label || 'Processing...'}
