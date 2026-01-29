@@ -7,15 +7,55 @@ from typing import List, Optional
 from uuid import UUID
 from pathlib import Path
 from app.db import get_db
-from app.models import Sound
+from app.models import Sound, Shortcut, Settings as SettingsModel
 from app.schemas import SoundCreate, SoundUpdate, SoundResponse
 from app.services.storage import storage_service
 from app.services.youtube import youtube_service
+from app.services.system_shortcuts import system_shortcut_service
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sounds", tags=["sounds"])
+
+
+def _resync_shortcuts_for_sound(sound_id: UUID, db: Session) -> None:
+    """Re-register all enabled shortcuts for this sound (e.g. after local_path is set)."""
+    try:
+        sound = db.query(Sound).filter(Sound.id == sound_id).first()
+        if not sound:
+            return
+        shortcuts = db.query(Shortcut).filter(
+            Shortcut.sound_id == sound_id,
+            Shortcut.enabled == True,
+        ).all()
+        if not shortcuts:
+            return
+        settings_row = db.query(SettingsModel).filter(SettingsModel.id == 1).first()
+        mpv_path = (settings_row and settings_row.mpv_path) or "mpv"
+        audio_device = (settings_row and settings_row.default_output_device) or ""
+        local_path = None
+        if sound.local_path:
+            try:
+                local_path = str(Path(sound.local_path).resolve())
+            except Exception:
+                local_path = sound.local_path
+        for shortcut in shortcuts:
+            system_shortcut_service.register_shortcut(
+                str(shortcut.id),
+                shortcut.hotkey,
+                str(shortcut.sound_id),
+                sound.name,
+                shortcut.action.lower(),
+                local_path=local_path,
+                volume=sound.volume,
+                trim_start_sec=float(sound.trim_start_sec) if sound.trim_start_sec is not None else None,
+                trim_end_sec=float(sound.trim_end_sec) if sound.trim_end_sec is not None else None,
+                mpv_path=mpv_path,
+                audio_device=audio_device,
+            )
+    except Exception as e:
+        logger.warning("Failed to resync shortcuts for sound %s: %s", sound_id, e)
 
 
 @router.get("", response_model=List[SoundResponse])
@@ -242,6 +282,7 @@ async def upload_audio(
     sound.local_path = str(audio_path)
     db.commit()
     db.refresh(sound)
+    _resync_shortcuts_for_sound(sound_id, db)
     return sound
 
 
@@ -297,6 +338,7 @@ async def ingest_sound(sound_id: UUID, db: Session = Depends(get_db)):
         
         db.commit()
         db.refresh(sound)
+        _resync_shortcuts_for_sound(sound_id, db)
         return sound
     except Exception as e:
         error_msg = str(e)

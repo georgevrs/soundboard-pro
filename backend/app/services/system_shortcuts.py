@@ -1,6 +1,7 @@
 import subprocess
 import logging
 import os
+import shlex
 from typing import Optional
 from pathlib import Path
 from app.config import settings
@@ -94,40 +95,100 @@ class SystemShortcutService:
             raise
     
     def _build_command(self, sound_id: str, action: str) -> str:
-        """Build the command to execute when shortcut is pressed"""
-        # Use curl to call the backend API
-        # The backend must be running for this to work
+        """Build the command to execute when shortcut is pressed (API call; requires backend)."""
         endpoint = f"{self.api_base_url}/api/playback/{action.lower()}/{sound_id}"
         return f"curl -X POST '{endpoint}' > /dev/null 2>&1"
+
+    def _build_direct_play_command(
+        self,
+        local_path: str,
+        mpv_path: str = "mpv",
+        volume: Optional[int] = 80,
+        trim_start_sec: Optional[float] = None,
+        trim_end_sec: Optional[float] = None,
+        audio_device: Optional[str] = None,
+    ) -> str:
+        """
+        Build a command that runs mpv directly on the audio file.
+        This works when the app is not running (no backend required).
+        Path must be absolute so it works from any working directory.
+        """
+        path = Path(local_path).resolve()
+        if not path.is_absolute():
+            path = path.resolve()
+        path_str = str(path)
+        # Quote path for safe shell execution (handles spaces and special chars)
+        path_quoted = shlex.quote(path_str)
+        mpv_quoted = shlex.quote(mpv_path) if os.path.sep in mpv_path else mpv_path
+        parts = [mpv_quoted, "--no-video", "--really-quiet", "--no-terminal"]
+        if volume is not None:
+            parts.append(f"--volume={volume}")
+        if audio_device and audio_device.strip():
+            # --audio-device value may need quoting
+            dev = audio_device.strip()
+            if " " in dev or "'" in dev:
+                parts.append(f"--audio-device={shlex.quote(dev)}")
+            else:
+                parts.append(f"--audio-device={dev}")
+        if trim_start_sec is not None:
+            parts.append(f"--start={trim_start_sec}")
+        if trim_end_sec is not None and trim_start_sec is not None:
+            length = trim_end_sec - trim_start_sec
+            if length > 0:
+                parts.append(f"--length={length}")
+        elif trim_end_sec is not None:
+            parts.append(f"--length={trim_end_sec}")
+        parts.append(path_quoted)
+        return " ".join(parts) + " &"
     
     def register_shortcut(
-        self, 
-        shortcut_id: str, 
-        hotkey: str, 
+        self,
+        shortcut_id: str,
+        hotkey: str,
         sound_id: str,
         sound_name: str,
-        action: str = "play"
+        action: str = "play",
+        *,
+        local_path: Optional[str] = None,
+        volume: Optional[int] = None,
+        trim_start_sec: Optional[float] = None,
+        trim_end_sec: Optional[float] = None,
+        mpv_path: str = "mpv",
+        audio_device: Optional[str] = None,
     ) -> bool:
         """
-        Register a system-level keyboard shortcut using gsettings
-        
-        Args:
-            shortcut_id: Unique identifier for the shortcut
-            hotkey: Hotkey in format "Ctrl+Alt+1"
-            sound_name: Name of the sound (for display)
-            action: Action to perform (play, stop, toggle, restart)
-        
-        Returns:
-            True if successful, False otherwise
+        Register a system-level keyboard shortcut using gsettings.
+
+        When action is "play" and local_path is provided and the file exists,
+        the shortcut runs mpv directly so it works even when the app is not running.
+        Otherwise the shortcut calls the backend API (requires app running).
         """
         if not self._check_gsettings_available():
             logger.warning("gsettings not available - system shortcuts will not work")
             return False
-        
+
         try:
             binding_path = self._get_binding_path(shortcut_id)
             gsettings_hotkey = self._convert_hotkey_to_gsettings_format(hotkey)
-            command = self._build_command(sound_id, action)
+
+            # Prefer direct mpv command when we have a playable local file (works without app)
+            if action.lower() == "play" and local_path:
+                path = Path(local_path).resolve()
+                if path.is_file():
+                    command = self._build_direct_play_command(
+                        local_path=str(path),
+                        mpv_path=mpv_path or "mpv",
+                        volume=volume if volume is not None else 80,
+                        trim_start_sec=trim_start_sec,
+                        trim_end_sec=trim_end_sec,
+                        audio_device=audio_device or "",
+                    )
+                    logger.info(f"Shortcut {shortcut_id} will play file directly (no backend required)")
+                else:
+                    command = self._build_command(sound_id, action)
+                    logger.warning(f"Shortcut {shortcut_id}: file not found at {path}, using API fallback")
+            else:
+                command = self._build_command(sound_id, action)
             
             # Get current bindings
             current_bindings = self._get_all_custom_bindings()
@@ -210,21 +271,22 @@ class SystemShortcutService:
             logger.error(f"Error unregistering shortcut {shortcut_id}: {e}", exc_info=True)
             return False
     
-    def sync_all_shortcuts(self, shortcuts: list) -> bool:
+    def sync_all_shortcuts(
+        self,
+        shortcuts: list,
+        *,
+        mpv_path: str = "mpv",
+        audio_device: Optional[str] = None,
+    ) -> bool:
         """
-        Sync all shortcuts from database to system
-        This should be called on startup to register all enabled shortcuts
-        
-        Args:
-            shortcuts: List of shortcut dicts with id, hotkey, sound_name, action, enabled
-        
-        Returns:
-            True if successful, False otherwise
+        Sync all shortcuts from database to system.
+        Shortcut dicts may include local_path, volume, trim_start_sec, trim_end_sec
+        so that play shortcuts use direct mpv (works when app is not running).
         """
         if not self._check_gsettings_available():
             logger.warning("gsettings not available - skipping shortcut sync")
             return False
-        
+
         try:
             # First, clear all soundboard bindings
             current_bindings = self._get_all_custom_bindings()
@@ -232,7 +294,7 @@ class SystemShortcutService:
             for binding in soundboard_bindings:
                 current_bindings.remove(binding)
             self._set_custom_bindings(current_bindings)
-            
+
             # Register all enabled shortcuts
             for shortcut in shortcuts:
                 if shortcut.get("enabled", True):
@@ -241,12 +303,18 @@ class SystemShortcutService:
                         shortcut["hotkey"],
                         shortcut.get("sound_id", ""),
                         shortcut.get("sound_name", "Unknown"),
-                        shortcut.get("action", "play").lower()
+                        shortcut.get("action", "play").lower(),
+                        local_path=shortcut.get("local_path"),
+                        volume=shortcut.get("volume"),
+                        trim_start_sec=shortcut.get("trim_start_sec"),
+                        trim_end_sec=shortcut.get("trim_end_sec"),
+                        mpv_path=shortcut.get("mpv_path") or mpv_path,
+                        audio_device=shortcut.get("audio_device") or audio_device or "",
                     )
-            
+
             logger.info(f"Synced {len([s for s in shortcuts if s.get('enabled', True)])} shortcuts to system")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error syncing shortcuts: {e}", exc_info=True)
             return False

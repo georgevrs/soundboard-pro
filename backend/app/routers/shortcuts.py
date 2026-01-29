@@ -1,9 +1,10 @@
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 from app.db import get_db
-from app.models import Shortcut, Sound
+from app.models import Shortcut, Sound, Settings as SettingsModel
 from app.schemas import ShortcutCreate, ShortcutUpdate, ShortcutResponse
 from app.services.system_shortcuts import system_shortcut_service
 import logging
@@ -38,19 +39,34 @@ def create_shortcut(shortcut: ShortcutCreate, db: Session = Depends(get_db)):
     db.add(db_shortcut)
     db.commit()
     db.refresh(db_shortcut)
-    
-    # Register with system if enabled
+
+    # Register with system if enabled (use direct mpv when we have local_path so it works without app)
     if db_shortcut.enabled:
         sound = db.query(Sound).filter(Sound.id == db_shortcut.sound_id).first()
+        settings_row = db.query(SettingsModel).filter(SettingsModel.id == 1).first()
         sound_name = sound.name if sound else "Unknown"
+        local_path = None
+        if sound and sound.local_path:
+            try:
+                local_path = str(Path(sound.local_path).resolve())
+            except Exception:
+                local_path = sound.local_path
+        mpv_path = (settings_row and settings_row.mpv_path) or "mpv"
+        audio_device = (settings_row and settings_row.default_output_device) or ""
         system_shortcut_service.register_shortcut(
             str(db_shortcut.id),
             db_shortcut.hotkey,
             str(db_shortcut.sound_id),
             sound_name,
-            db_shortcut.action.lower()
+            db_shortcut.action.lower(),
+            local_path=local_path,
+            volume=sound.volume if sound else None,
+            trim_start_sec=float(sound.trim_start_sec) if sound and sound.trim_start_sec is not None else None,
+            trim_end_sec=float(sound.trim_end_sec) if sound and sound.trim_end_sec is not None else None,
+            mpv_path=mpv_path,
+            audio_device=audio_device,
         )
-    
+
     return db_shortcut
 
 
@@ -100,22 +116,37 @@ def update_shortcut(
 
     db.commit()
     db.refresh(shortcut)
-    
+
     # Re-register with system if enabled, or unregister if disabled
     sound = db.query(Sound).filter(Sound.id == shortcut.sound_id).first()
+    settings_row = db.query(SettingsModel).filter(SettingsModel.id == 1).first()
     sound_name = sound.name if sound else "Unknown"
-    
+
     if shortcut.enabled:
+        local_path = None
+        if sound and sound.local_path:
+            try:
+                local_path = str(Path(sound.local_path).resolve())
+            except Exception:
+                local_path = sound.local_path
+        mpv_path = (settings_row and settings_row.mpv_path) or "mpv"
+        audio_device = (settings_row and settings_row.default_output_device) or ""
         system_shortcut_service.register_shortcut(
             str(shortcut.id),
             shortcut.hotkey,
             str(shortcut.sound_id),
             sound_name,
-            shortcut.action.lower()
+            shortcut.action.lower(),
+            local_path=local_path,
+            volume=sound.volume if sound else None,
+            trim_start_sec=float(sound.trim_start_sec) if sound and sound.trim_start_sec is not None else None,
+            trim_end_sec=float(sound.trim_end_sec) if sound and sound.trim_end_sec is not None else None,
+            mpv_path=mpv_path,
+            audio_device=audio_device,
         )
     else:
         system_shortcut_service.unregister_shortcut(str(shortcut.id))
-    
+
     return shortcut
 
 
